@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<title>Validator swimlane</title>
+	<script type="text/javascript" src="https://d3js.org/d3.v3.min.js"></script>
+	<link rel="stylesheet" href="style.css" type="text/css">
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans:300" rel='stylesheet' type='text/css'>
+  </head>
+  <body>
+    <!-- EDIT THESE These are the pages! -->
+    <script src="./data/data0.json"></script>
+	<script type="text/javascript">
+      // Initial code stolen from http://bl.ocks.org/renecnielsen/9753502
+      //
+      // Code used to be fine but then I entered the scene and now it's beyond
+      // terrible  :-)
+
+      function getColorForValidator(inclusionDistance) {
+          if (inclusionDistance <= 1) {
+              return "perfectValidator"
+          } else if (inclusionDistance <= 5) {
+              return "slowValidator"
+          } else if (inclusionDistance < 65) {
+              return "verySlowValidator"
+          } else {
+              return "missingValidator"
+          }
+      }
+
+      function getColorGradientForValidator(inclusionDistance) {
+          if (inclusionDistance == 1) { // optimal
+              return "#82c91e"
+          } else if (inclusionDistance == 65535) { // missing
+              return "#868e96"
+          }
+
+          var gradient = d3.scale.linear()
+              .domain([2, 65])
+              .range(["#c0eb75", "#c92a2a"]);
+
+          return gradient(inclusionDistance)
+      }
+
+
+      function getSortedIndices(items) {
+          // Sort the iterable and return a list of indices
+          // best code https://stackoverflow.com/a/41175077
+
+          // make list with indices and values
+          indexedTest = items.map(function(e,i){return {ind: i, val: e}});
+          // sort index/value couples, based on values
+          indexedTest.sort(function(x, y){return x.val > y.val ? 1 : x.val == y.val ? 0 : -1});
+          // make list keeping only indices
+          indices = indexedTest.map(function(e){return e.ind});
+
+          return indices
+      }
+
+      function getSortedRank(value, items, items_indices) {
+          // Given a validator index we want to find what's it's sorted index
+          // We first find its index in validators, and then find where that value is in validators_indices and that's the score
+
+          sorted_index = items.indexOf(value)
+          return items_indices.indexOf(sorted_index)
+      }
+
+      function getMetadataFromJson(items) {
+          // Find the number of validators included and the number of epochs
+          // and also sort them so that we can arrange them in a nice way on the page
+          var validators_tmp = new Set()
+          var epochs_tmp = new Set()
+          for(var i = 0; i < items.length; ++i){
+              validators_tmp.add(items[i].validator_idx)
+              epochs_tmp.add(items[i].epoch)
+          }
+
+          var validators = Array.from(validators_tmp)
+          var epochs = Array.from(epochs_tmp)
+
+          console.log("Dealing with " + validators.length +" validators over "+ epochs.length + " epochs!")
+
+          validators_indices = getSortedIndices(validators)
+          epochs_indices = getSortedIndices(epochs)
+
+//          for (var i =0 ; i < validators_indices.length; i++) {
+//              console.log("%d validator: %d valIndex", i, validators[validators_indices[i]])
+//          }
+
+          return [validators, validators_indices, epochs, epochs_indices]
+      }
+
+      // XXX eventually replace with pagination code
+      var items = data
+
+      // Load data from Json and extract useful stuff
+      var values = getMetadataFromJson(items)
+      validators = values[0]
+      validators_indices = values[1]
+      epochs = values[2]
+      epochs_indices = values[3]
+
+      // Global dimensions
+	  var timeBegin = 0;
+	  var timeEnd = 2000;
+      var laneLength = 100 // hardcoded?? controls height of lanes
+	  var m = [20, 15, 15, 100], // top right bottom left (controls where edges start)
+		  w = 960 - m[1] - m[3], // max width
+		  h = 1000 - m[0] - m[2], // height on the page
+		  panelHeight = laneLength * 6 + 250, // height of each lane
+		  mainHeight = h - panelHeight - 50; // where in the page height
+
+	  // x,x1 is a transformation (function) on the x axis
+	  var x = d3.scale.linear()
+		  .domain([timeBegin, timeEnd])
+		  .range([0, w]);
+	  var x1 = d3.scale.linear()
+		  .range([0, w]);
+      // y1 controls
+	  var y1 = d3.scale.linear()
+		  .domain([0, laneLength])
+		  .range([0, mainHeight]);
+      // y2 controls the lane height
+	  var y2 = d3.scale.linear()
+		  .domain([0, laneLength])
+		  .range([0, panelHeight]);
+
+	  var chart = d3.select("body")
+		  .append("svg")
+		  .attr("width", w + m[1] + m[3])
+		  .attr("height", validators.length*13 + h + m[0] + m[2]) // controls the actual height of the chart (important!)
+		  .attr("class", "chart");
+
+      ////////////////////////////////////////////////////////////
+
+      // Top-level object
+	  var panel = chart.append("g")
+		  .attr("transform", "translate(" + m[3] + "," + (mainHeight + m[0]) + ")")
+		  .attr("width", w)
+		  .attr("height", panelHeight)
+		  .attr("class", "panel");
+
+	  // the actual lanes (the horizontal lines)
+	  panel.selectAll(".validatorLines")
+	.data(items)
+	.enter().append("line")
+	.attr("x1", -60) // edge of lane separator
+	.attr("y1", function(d) { // find the index of that validator to put it in the right height
+        return 1.5*y2(getSortedRank(d.validator_idx, validators, validators_indices))
+    })
+	.attr("x2", w)
+	.attr("y2", function(d) {
+        return 1.5*y2(getSortedRank(d.validator_idx, validators, validators_indices))
+    });
+
+      // does the label on the far left
+	  var validatorText = panel.selectAll(".validatorText")
+	      .data(items)
+	      .enter()
+          .append("a") // add link to beaconchain
+          .attr("xlink:href", function(d) { return "https://beaconcha.in/validator/"+d.validator_idx;})
+          .append("text")
+	      .text(function(d,i) {return "Validator "+d.validator_idx;})
+	      .attr("x", -m[1])
+	      .attr("y", function(d, i) {return 1.5*y2(getSortedRank(d.validator_idx, validators, validators_indices) + .5);})      // control height based on validator idx
+
+	      .attr("dy", ".5ex")
+	      .attr("text-anchor", "end");
+
+
+	  // the epoch rectangles (also does color)
+	  panel.selectAll("panelItems")
+	.data(items)
+	.enter()
+    .append("rect") // add rectangle
+//	.attr("class", function(d) {return getColorForValidator(d.distance);}) // controls the color
+    .attr("fill", function(d) {return getColorGradientForValidator(d.distance);}) // controls the color
+	.attr("x", function(d) {return 100*x(getSortedRank(d.epoch, epochs, epochs_indices));}) // space out the epochs
+	.attr("y", function(d) {return 1.5*y2(getSortedRank(d.validator_idx, validators, validators_indices) + .5) - 5;})
+	.attr("width", 40) // Width of rectangles
+	.attr("height", 10); // height of rectangles
+
+	  // panel labels within the rectangles
+	  panel.selectAll(".panelLabels")
+	.data(items)
+	.enter()
+    .append("a") // add link to beaconchain
+    .attr("xlink:href", function(d) { return "https://beaconcha.in/epoch/"+d.epoch;})
+    .append("text")
+	.text(function(d) {return "#" + d.epoch;})
+	.attr("x", function(d) {return 100*x(getSortedRank(d.epoch, epochs, epochs_indices))+10;}) // space out the epochs
+	.attr("y", function(d) {return 1.5*y2(getSortedRank(d.validator_idx, validators, validators_indices) + .5);})
+	.attr("dy", ".5ex");
+
+	  display();
+
+	  function display() {
+          ;
+	  }
+	</script>
+  </body>
+</html>

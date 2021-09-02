@@ -1,0 +1,31 @@
+.chart {
+  shape-rendering: crispEdges;
+}
+
+.panel text {
+  font: 7px 'Open Sans';
+}
+
+.perfectValidator {
+    fill: #94d82d;
+    fill-opacity: .7;
+    stroke-width: 6;
+}
+
+.slowValidator {
+  fill: #ffd43b;
+  stroke-width: 6;
+}
+
+.verySlowValidator {
+    fill: #f03e3e;
+  fill-opacity: .7;
+  stroke-width: 6;
+}
+
+.missingValidator {
+  fill: #212529;
+  fill-opacity: .6;
+  stroke-width: 6;
+}
+

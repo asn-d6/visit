@@ -1,0 +1,5 @@
+visit
+.gdb_history
+*.db
+*.db-journal
+visualize_d3/data
